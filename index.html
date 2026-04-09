@@ -394,10 +394,13 @@ function initLevel(lvlIdx) {
 
   // Ship start (on planet surface, launchpad style)
   const startX = planetX;
-  const startY = planetY - lvl.planet.radius * scaleFactor;
-  // Give ship a small upward launch velocity so gravity doesn't instantly crash it into the planet
-  const startVX = 0;
-  const startVY = -1.5;
+  const startY = planetY - lvl.planet.radius * scaleFactor - 2; // 2px above surface
+  // Give ship real orbital velocity at this altitude — horizontal, pointing tangent
+  // v_orbit = sqrt(G * M / r) — enough horizontal speed that gravity curves it into orbit
+  const orbitR = lvl.planet.radius * scaleFactor + 2;
+  const orbitV = Math.sqrt(G * lvl.planet.mass / orbitR) * 0.85; // 85% of full orbit = stable ellipse
+  const startVX = orbitV;  // horizontal = prograde (left)
+  const startVY = -1.0;    // slight upward boost
 
   ship = {
     x: startX, y: startY,
@@ -408,7 +411,8 @@ function initLevel(lvlIdx) {
     alive: true,
     crashed: false,
     fuelEmptyTime: null,
-    landed: true
+    landed: true,
+    launchGrace: 0  // grace period frames after launch — no collision detection
   };
 
   planets = [];
@@ -474,10 +478,14 @@ function updatePhysics() {
     // Check for launch input
     if (keys['ArrowUp'] || keys['KeyW'] || keys['w'] || keys['W']) {
       ship.landed = false;
+      ship.launchGrace = 15; // 15-frame grace period — no crash detection while ascending
     } else {
       return; // Stay frozen on surface
     }
   }
+
+  // Count down grace period
+  if (ship.launchGrace > 0) ship.launchGrace--;
 
   const dt = 1;
 
@@ -543,25 +551,27 @@ function updatePhysics() {
   }
   trailPoints.forEach(t => t.age++);
 
-  // Collision with planet
-  const planet = planets.find(p => p.type === 'planet');
-  const dxP = ship.x - planet.x;
-  const dyP = ship.y - planet.y;
-  const distP = Math.sqrt(dxP * dxP + dyP * dyP);
-  if (distP < planet.radius) {
-    triggerCrash('Crashed into planet!');
-    return;
-  }
-
-  // Collision with moons (use for...of so return actually exits the function)
-  for (const p of planets) {
-    if (p.type !== 'moon') continue;
-    const dx = ship.x - p.x;
-    const dy = ship.y - p.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist < p.radius) {
-      triggerCrash('Crashed into moon!');
+  // Collision with planet — skip during grace period after launch
+  if (ship.launchGrace === 0) {
+    const planet = planets.find(p => p.type === 'planet');
+    const dxP = ship.x - planet.x;
+    const dyP = ship.y - planet.y;
+    const distP = Math.sqrt(dxP * dxP + dyP * dyP);
+    if (distP <= planet.radius) {
+      triggerCrash('Crashed into planet!');
       return;
+    }
+
+    // Collision with moons
+    for (const p of planets) {
+      if (p.type !== 'moon') continue;
+      const dx = ship.x - p.x;
+      const dy = ship.y - p.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist <= p.radius) {
+        triggerCrash('Crashed into moon!');
+        return;
+      }
     }
   }
 
