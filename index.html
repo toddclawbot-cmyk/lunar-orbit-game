@@ -1,0 +1,1073 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lunar Ascent</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg-deep: #050510;
+  --bg-panel: rgba(8, 12, 28, 0.85);
+  --accent-cyan: #00e5ff;
+  --accent-teal: #00ffc8;
+  --accent-orange: #ff6b35;
+  --accent-red: #ff2d55;
+  --accent-yellow: #ffd60a;
+  --text-primary: #e8f4f8;
+  --text-dim: #7a9aa8;
+  --glow-cyan: 0 0 20px rgba(0, 229, 255, 0.6);
+  --glow-teal: 0 0 20px rgba(0, 255, 200, 0.6);
+  --glow-orange: 0 0 20px rgba(255, 107, 53, 0.6);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: var(--bg-deep);
+  overflow: hidden;
+  font-family: 'Orbitron', monospace;
+  color: var(--text-primary);
+  user-select: none;
+}
+canvas { display: block; }
+#ui {
+  position: fixed; inset: 0; pointer-events: none;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+.screen {
+  display: none; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; gap: 20px; padding: 40px;
+}
+.screen.active { display: flex; }
+#title-screen h1 {
+  font-size: clamp(2.5rem, 8vw, 5rem);
+  font-weight: 900;
+  color: var(--accent-cyan);
+  text-shadow: var(--glow-cyan), 0 0 60px rgba(0, 229, 255, 0.3);
+  letter-spacing: 0.1em;
+  animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { text-shadow: var(--glow-cyan), 0 0 60px rgba(0, 229, 255, 0.3); }
+  50% { text-shadow: 0 0 40px rgba(0, 229, 255, 0.9), 0 0 80px rgba(0, 229, 255, 0.5); }
+}
+#title-screen .subtitle {
+  font-size: clamp(0.8rem, 2vw, 1.2rem);
+  color: var(--text-dim);
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+}
+.btn {
+  pointer-events: all;
+  background: transparent;
+  border: 2px solid var(--accent-cyan);
+  color: var(--accent-cyan);
+  font-family: 'Orbitron', monospace;
+  font-size: 1rem;
+  font-weight: 700;
+  padding: 14px 40px;
+  cursor: pointer;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  transition: all 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+.btn::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: var(--accent-cyan);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.btn:hover { color: var(--bg-deep); box-shadow: var(--glow-cyan); }
+.btn:hover::before { opacity: 1; }
+.btn span { position: relative; z-index: 1; }
+.btn-small { font-size: 0.75rem; padding: 8px 20px; }
+.btn-danger { border-color: var(--accent-red); color: var(--accent-red); }
+.btn-danger:hover { box-shadow: var(--glow-orange); color: var(--bg-deep); }
+.btn-danger::before { background: var(--accent-red); }
+.level-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+  pointer-events: all;
+}
+.level-btn {
+  background: var(--bg-panel);
+  border: 2px solid var(--accent-cyan);
+  color: var(--accent-cyan);
+  font-family: 'Orbitron', monospace;
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 16px 20px;
+  cursor: pointer;
+  letter-spacing: 0.1em;
+  transition: all 0.2s;
+  text-align: center;
+}
+.level-btn:hover { background: rgba(0, 229, 255, 0.15); box-shadow: var(--glow-cyan); }
+.level-btn.locked { border-color: var(--text-dim); color: var(--text-dim); cursor: not-allowed; opacity: 0.4; }
+.level-btn .lvl-num { font-size: 1.4rem; display: block; }
+.level-btn .lvl-name { font-size: 0.6rem; display: block; margin-top: 4px; color: var(--text-dim); letter-spacing: 0.15em; }
+#hud {
+  position: fixed; top: 0; left: 0; right: 0;
+  padding: 16px 24px;
+  display: none;
+  justify-content: space-between;
+  align-items: flex-start;
+  pointer-events: none;
+}
+#hud.active { display: flex; }
+.hud-left, .hud-right, .hud-center {
+  display: flex; flex-direction: column; gap: 8px;
+}
+.hud-center { align-items: center; }
+.hud-right { align-items: flex-end; }
+.hud-label {
+  font-size: 0.55rem;
+  color: var(--text-dim);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+.hud-value {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--accent-cyan);
+  text-shadow: var(--glow-cyan);
+}
+.hud-value.danger { color: var(--accent-orange); text-shadow: var(--glow-orange); }
+.hud-value.success { color: var(--accent-teal); text-shadow: var(--glow-teal); }
+.gauge-wrap { display: flex; flex-direction: column; gap: 4px; min-width: 140px; }
+.gauge-bar {
+  height: 10px;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(0, 229, 255, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+.gauge-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-cyan), var(--accent-teal));
+  transition: width 0.1s;
+  box-shadow: var(--glow-cyan);
+}
+.gauge-fill.low { background: linear-gradient(90deg, var(--accent-orange), var(--accent-red)); box-shadow: var(--glow-orange); }
+.gauge-fill.critical { animation: blink 0.4s infinite; }
+@keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+#hud-restart {
+  pointer-events: all;
+  position: fixed; bottom: 20px; right: 20px;
+  font-size: 0.65rem;
+}
+.vel-comparison {
+  display: flex; gap: 8px; align-items: center;
+  font-size: 0.75rem;
+}
+.vel-comparison .current { color: var(--accent-cyan); }
+.vel-comparison .needed { color: var(--text-dim); font-size: 0.6rem; }
+#msg-overlay {
+  position: fixed; inset: 0;
+  display: none; align-items: center; justify-content: center;
+  background: rgba(5, 5, 16, 0.7);
+  pointer-events: all;
+  z-index: 100;
+}
+#msg-overlay.active { display: flex; }
+.msg-box {
+  background: var(--bg-panel);
+  border: 2px solid var(--accent-cyan);
+  padding: 40px 60px;
+  text-align: center;
+  display: flex; flex-direction: column; gap: 20px;
+  box-shadow: var(--glow-cyan), 0 0 100px rgba(0, 229, 255, 0.1);
+  max-width: 90vw;
+}
+.msg-box.success { border-color: var(--accent-teal); box-shadow: var(--glow-teal), 0 0 100px rgba(0, 255, 200, 0.1); }
+.msg-box.failure { border-color: var(--accent-red); box-shadow: var(--glow-orange), 0 0 100px rgba(255, 107, 53, 0.1); }
+.msg-title { font-size: 2rem; font-weight: 900; }
+.msg-box.success .msg-title { color: var(--accent-teal); text-shadow: var(--glow-teal); }
+.msg-box.failure .msg-title { color: var(--accent-red); }
+.msg-desc { font-size: 0.8rem; color: var(--text-dim); letter-spacing: 0.1em; line-height: 1.8; }
+.msg-buttons { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+.controls-hint {
+  font-size: 0.6rem;
+  color: var(--text-dim);
+  letter-spacing: 0.15em;
+  line-height: 2;
+}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui">
+  <div id="title-screen" class="screen active">
+    <h1>LUNAR ASCENT</h1>
+    <p class="subtitle">Orbital Flight Simulator</p>
+    <button class="btn" onclick="showLevelSelect()"><span>Launch Mission</span></button>
+    <button class="btn btn-small" onclick="showLevelSelect()"><span>Level Select</span></button>
+    <div class="controls-hint">
+      W/↑ THRUST &nbsp;|&nbsp; S/↓ BRAKE &nbsp;|&nbsp; A/← ROTATE LEFT &nbsp;|&nbsp; D/→ ROTATE RIGHT<br>
+      Achieve stable orbit around the moon to complete each level
+    </div>
+  </div>
+  <div id="level-screen" class="screen">
+    <h2 style="font-size:1.5rem;color:var(--accent-cyan);letter-spacing:0.2em;">SELECT MISSION</h2>
+    <div class="level-grid" id="level-grid"></div>
+    <button class="btn btn-small" onclick="showTitle()"><span>Back</span></button>
+  </div>
+  <div id="gameplay-screen" class="screen" style="display:none;"></div>
+</div>
+<div id="hud">
+  <div class="hud-left">
+    <div class="gauge-wrap">
+      <span class="hud-label">Fuel</span>
+      <div class="gauge-bar"><div class="gauge-fill" id="fuel-bar"></div></div>
+    </div>
+    <div>
+      <span class="hud-label">Altitude</span>
+      <div class="hud-value" id="hud-alt">—</div>
+    </div>
+  </div>
+  <div class="hud-center">
+    <div class="hud-label">Mission</div>
+    <div class="hud-value" id="hud-level" style="font-size:1.2rem;">LEVEL 1</div>
+  </div>
+  <div class="hud-right">
+    <div>
+      <span class="hud-label">Velocity</span>
+      <div class="vel-comparison">
+        <span class="current" id="hud-vel">—</span>
+        <span class="needed" id="hud-vel-needed">orbit: —</span>
+      </div>
+    </div>
+    <div>
+      <span class="hud-label">Status</span>
+      <div class="hud-value" id="hud-status">ORBITING</div>
+    </div>
+  </div>
+</div>
+<div id="msg-overlay">
+  <div class="msg-box" id="msg-box">
+    <div class="msg-title" id="msg-title"></div>
+    <div class="msg-desc" id="msg-desc"></div>
+    <div class="msg-buttons" id="msg-buttons"></div>
+  </div>
+</div>
+<button class="btn btn-small btn-danger" id="hud-restart" onclick="restartLevel()" style="display:none;">Restart</button>
+<script>
+// ==================== GAME ENGINE ====================
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H;
+
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', () => { resize(); if (gameState === 'playing') scalePositions(); });
+
+// ==================== LEVELS ====================
+const LEVELS = [
+  {
+    name: 'Training Moon',
+    planet: { radius: 60, mass: 5e4, color: '#4a6fa5' },
+    moon: { radius: 20, mass: 3e3, color: '#c8d6e5', orbitRadius: 220, angle: 0, angularVel: 0, glowColor: 'rgba(200,214,229,0.3)' },
+    shipStart: { x: 0, y: 0, vx: 0, vy: 0, angle: -Math.PI/2 },
+    fuel: 120,
+    orbitBand: { inner: 22, outer: 45 },
+    description: 'Static moon, close orbit. Learn the basics.'
+  },
+  {
+    name: 'Drifting Rock',
+    planet: { radius: 60, mass: 5e4, color: '#4a6fa5' },
+    moon: { radius: 18, mass: 2500, color: '#a0a0b0', orbitRadius: 300, angle: 0, angularVel: 0, glowColor: 'rgba(160,160,176,0.3)' },
+    shipStart: { x: 0, y: 0, vx: 0, vy: 0, angle: -Math.PI/2 },
+    fuel: 80,
+    orbitBand: { inner: 20, outer: 40 },
+    description: 'Farther moon, less fuel. Precision required.'
+  },
+  {
+    name: 'Wandering Moon',
+    planet: { radius: 60, mass: 5e4, color: '#4a6fa5' },
+    moon: { radius: 20, mass: 2800, color: '#d4a574', orbitRadius: 260, angle: 0, angularVel: 0.0003, glowColor: 'rgba(212,165,116,0.3)' },
+    shipStart: { x: 0, y: 0, vx: 0, vy: 0, angle: -Math.PI/2 },
+    fuel: 95,
+    orbitBand: { inner: 22, outer: 44 },
+    description: 'Moon drifts slowly. Time your approach.'
+  },
+  {
+    name: 'Binary System',
+    planet: { radius: 55, mass: 5e4, color: '#4a6fa5' },
+    moons: [
+      { radius: 16, mass: 2000, color: '#7ec8e3', orbitRadius: 200, angle: 0, angularVel: 0.0004, glowColor: 'rgba(126,200,227,0.3)' },
+      { radius: 14, mass: 1600, color: '#e3c87e', orbitRadius: 320, angle: Math.PI, angularVel: -0.0003, glowColor: 'rgba(227,200,126,0.3)' }
+    ],
+    shipStart: { x: 0, y: 0, vx: 0, vy: 0, angle: -Math.PI/2 },
+    fuel: 110,
+    orbitBand: { inner: 18, outer: 36 },
+    description: 'Two moons, navigate between gravity wells.'
+  },
+  {
+    name: 'The Gauntlet',
+    planet: { radius: 60, mass: 5e4, color: '#4a6fa5' },
+    moon: { radius: 15, mass: 2200, color: '#ff6b6b', orbitRadius: 380, angle: 0, angularVel: 0.0008, glowColor: 'rgba(255,107,107,0.3)' },
+    shipStart: { x: 0, y: 0, vx: 0, vy: 0, angle: -Math.PI/2 },
+    fuel: 70,
+    orbitBand: { inner: 17, outer: 30 },
+    description: 'Fast moon, minimal fuel, tight orbit.'
+  }
+];
+
+// ==================== GAME STATE ====================
+let gameState = 'title'; // title, levelSelect, playing, paused
+let currentLevel = 0;
+let unlockedLevels = parseInt(localStorage.getItem('lunarAscent_unlocked') || '1');
+let scaleFactor = 1;
+let offsetX = 0, offsetY = 0;
+let shakeAmount = 0;
+let shakeX = 0, shakeY = 0;
+let screenShake = 0;
+
+// ==================== PHYSICS STATE ====================
+let ship = {};
+let planets = [];
+let particles = [];
+let trailPoints = [];
+let stars = [];
+let frameCount = 0;
+
+// ==================== INPUT ====================
+const keys = {};
+window.addEventListener('keydown', e => { keys[e.key] = true; keys[e.code] = true; if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault(); });
+window.addEventListener('keyup', e => { keys[e.key] = false; keys[e.code] = false; });
+
+// ==================== CONSTANTS ====================
+const G = 0.5;
+const THRUST_POWER = 0.04;
+const BRAKE_POWER = 0.025;
+const ROTATE_SPEED = 0.045;
+const TRAIL_MAX = 200;
+const PARTICLE_LIFE = 60;
+const ORBIT_CHECK_FRAMES = 120; // frames of stable orbit needed
+let orbitCheckCounter = 0;
+let orbitAchieved = false;
+
+// ==================== INITIALIZATION ====================
+function initStars() {
+  stars = [];
+  for (let i = 0; i < 300; i++) {
+    stars.push({
+      x: Math.random() * 4000 - 2000,
+      y: Math.random() * 4000 - 2000,
+      size: Math.random() * 2 + 0.3,
+      bright: Math.random(),
+      twinkle: Math.random() * Math.PI * 2
+    });
+  }
+}
+
+function initLevel(lvlIdx) {
+  const lvl = LEVELS[lvlIdx];
+  orbitCheckCounter = 0;
+  orbitAchieved = false;
+  particles = [];
+  trailPoints = [];
+
+  // Planet position (center)
+  const planetX = W / 2;
+  const planetY = H / 2;
+
+  scaleFactor = Math.min(W, H) / 700;
+  offsetX = W / 2;
+  offsetY = H / 2;
+
+  // Ship start (on planet surface, going up)
+  const startX = planetX;
+  const startY = planetY - lvl.planet.radius * scaleFactor;
+  const startVX = Math.sqrt(G * lvl.planet.mass / (lvl.planet.radius * scaleFactor)) * 0.4; // small horizontal push
+  const startVY = 0;
+
+  ship = {
+    x: startX, y: startY,
+    vx: startVX, vy: startVY,
+    angle: -Math.PI / 2,
+    fuel: lvl.fuel,
+    maxFuel: lvl.fuel,
+    alive: true,
+    crashed: false
+  };
+
+  planets = [];
+
+  // Planet
+  planets.push({
+    type: 'planet',
+    x: planetX, y: planetY,
+    radius: lvl.planet.radius * scaleFactor,
+    mass: lvl.planet.mass,
+    color: lvl.planet.color,
+    glowColor: 'rgba(74,111,165,0.2)'
+  });
+
+  // Moons
+  if (lvl.moons) {
+    lvl.moons.forEach(m => {
+      planets.push({
+        type: 'moon',
+        x: planetX + Math.cos(m.angle) * m.orbitRadius * scaleFactor,
+        y: planetY + Math.sin(m.angle) * m.orbitRadius * scaleFactor,
+        radius: m.radius * scaleFactor,
+        mass: m.mass,
+        color: m.color,
+        glowColor: m.glowColor,
+        orbitRadius: m.orbitRadius * scaleFactor,
+        angle: m.angle,
+        angularVel: m.angularVel,
+        initialAngle: m.angle
+      });
+    });
+  } else {
+    const m = lvl.moon;
+    planets.push({
+      type: 'moon',
+      x: planetX + Math.cos(m.angle) * m.orbitRadius * scaleFactor,
+      y: planetY + Math.sin(m.angle) * m.orbitRadius * scaleFactor,
+      radius: m.radius * scaleFactor,
+      mass: m.mass,
+      color: m.color,
+      glowColor: m.glowColor,
+      orbitRadius: m.orbitRadius * scaleFactor,
+      angle: m.angle,
+      angularVel: m.angularVel || 0,
+      initialAngle: m.angle
+    });
+  }
+
+  currentLevel = lvlIdx;
+}
+
+function scalePositions() {
+  // Recalculate scale when window resizes
+  const lvl = LEVELS[currentLevel];
+  scaleFactor = Math.min(W, H) / 700;
+  // Would need to re-init properly; just update display
+}
+
+// ==================== PHYSICS ====================
+function updatePhysics() {
+  if (!ship.alive) return;
+
+  const dt = 1;
+
+  // Moon movement
+  planets.forEach(p => {
+    if (p.type === 'moon' && p.angularVel) {
+      p.angle += p.angularVel * dt;
+      const planet = planets.find(x => x.type === 'planet');
+      p.x = planet.x + Math.cos(p.angle) * p.orbitRadius;
+      p.y = planet.y + Math.sin(p.angle) * p.orbitRadius;
+    }
+  });
+
+  // Gravity from all bodies
+  let ax = 0, ay = 0;
+  planets.forEach(p => {
+    const dx = p.x - ship.x;
+    const dy = p.y - ship.y;
+    const distSq = dx * dx + dy * dy;
+    const dist = Math.sqrt(distSq);
+    const force = G * p.mass / distSq;
+    ax += force * dx / dist;
+    ay += force * dy / dist;
+  });
+
+  ship.vx += ax * dt;
+  ship.vy += ay * dt;
+
+  // Input
+  let thrusting = false;
+  if ((keys['ArrowUp'] || keys['KeyW'] || keys['w'] || keys['W'] || keys['ArrowUp']) && ship.fuel > 0) {
+    ship.vx += Math.cos(ship.angle) * THRUST_POWER;
+    ship.vy += Math.sin(ship.angle) * THRUST_POWER;
+    ship.fuel -= 0.15;
+    thrusting = true;
+    spawnThrustParticles(1);
+  }
+  if ((keys['ArrowDown'] || keys['KeyS'] || keys['s'] || keys['S']) && ship.fuel > 0) {
+    ship.vx -= Math.cos(ship.angle) * BRAKE_POWER * 0.5;
+    ship.vy -= Math.sin(ship.angle) * BRAKE_POWER * 0.5;
+    ship.fuel -= 0.08;
+    thrusting = true;
+    spawnBrakeParticles(1);
+  }
+  if (keys['ArrowLeft'] || keys['KeyA'] || keys['a'] || keys['A']) {
+    ship.angle -= ROTATE_SPEED;
+  }
+  if (keys['ArrowRight'] || keys['KeyD'] || keys['d'] || keys['D']) {
+    ship.angle += ROTATE_SPEED;
+  }
+
+  ship.x += ship.vx * dt;
+  ship.y += ship.vy * dt;
+
+  if (thrusting && frameCount % 3 === 0) {
+    spawnTrailParticle();
+  }
+
+  // Trail
+  if (frameCount % 2 === 0) {
+    trailPoints.push({ x: ship.x, y: ship.y, age: 0 });
+    if (trailPoints.length > TRAIL_MAX) trailPoints.shift();
+  }
+  trailPoints.forEach(t => t.age++);
+
+  // Collision with planet
+  const planet = planets.find(p => p.type === 'planet');
+  const dxP = ship.x - planet.x;
+  const dyP = ship.y - planet.y;
+  const distP = Math.sqrt(dxP * dxP + dyP * dyP);
+  if (distP < planet.radius) {
+    triggerCrash('Crashed into planet!');
+    return;
+  }
+
+  // Collision with moons
+  planets.forEach(p => {
+    if (p.type !== 'moon') return;
+    const dx = ship.x - p.x;
+    const dy = ship.y - p.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < p.radius) {
+      triggerCrash('Crashed into moon!');
+      return;
+    }
+  });
+
+  // Fuel out
+  if (ship.fuel <= 0 && !orbitAchieved) {
+    // Still allow coasting, but check if they have no velocity capability
+    const speed = Math.sqrt(ship.vx * ship.vx + ship.vy * ship.vy);
+    if (speed < 0.1) {
+      triggerCrash('Drifting helplessly — out of fuel with no velocity!');
+    }
+  }
+
+  // Out of bounds
+  const maxDist = Math.max(W, H) * 2;
+  if (distP > maxDist) {
+    triggerCrash('Lost in deep space!');
+  }
+
+  // Orbit check
+  checkOrbit();
+}
+
+function checkOrbit() {
+  const lvl = LEVELS[currentLevel];
+  let moon = planets.find(p => p.type === 'moon');
+  if (!moon) {
+    // Binary system: check either moon
+    moon = planets.find(p => p.type === 'moon');
+  }
+  if (!moon) return;
+
+  const dx = ship.x - moon.x;
+  const dy = ship.y - moon.y;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  const inner = lvl.orbitBand.inner * scaleFactor;
+  const outer = lvl.orbitBand.outer * scaleFactor;
+
+  if (dist < inner || dist > outer) {
+    orbitCheckCounter = 0;
+    return;
+  }
+
+  // Check velocity relative to moon
+  const relVx = ship.vx - (moon.angularVel ? -moon.angularVel * (ship.x - planets.find(p=>p.type==='planet').x) : 0);
+  const relVy = ship.vy - (moon.angularVel ? -moon.angularVel * (ship.y - planets.find(p=>p.type==='planet').y) : 0);
+
+  // Tangential velocity check: dot product of position and velocity should be non-zero (circular component)
+  const radialVel = (dx * relVx + dy * relVy) / dist;
+  const tangentialSpeed = Math.sqrt(relVx * relVx + relVy * relVy - radialVel * radialVel);
+
+  // Orbital velocity needed: v = sqrt(GM/r)
+  const orbitalVel = Math.sqrt(G * moon.mass / dist);
+
+  // Good orbit: mostly tangential, speed within 50-150% of orbital
+  const isOrbiting = Math.abs(radialVel) < tangentialSpeed * 0.5 && tangentialSpeed > orbitalVel * 0.4 && tangentialSpeed < orbitalVel * 1.8;
+
+  if (isOrbiting) {
+    orbitCheckCounter++;
+    if (orbitCheckCounter >= ORBIT_CHECK_FRAMES) {
+      triggerSuccess();
+    }
+  } else {
+    orbitCheckCounter = Math.max(0, orbitCheckCounter - 2);
+  }
+}
+
+function triggerCrash(reason) {
+  ship.alive = false;
+  ship.crashed = true;
+  screenShake = 20;
+  spawnExplosion(ship.x, ship.y);
+  setTimeout(() => showMessage('failure', 'MISSION FAILED', reason, [
+    { label: 'Retry', fn: () => { hideMessage(); startLevel(currentLevel); } },
+    { label: 'Level Select', fn: () => { hideMessage(); showLevelSelect(); } }
+  ]), 800);
+}
+
+function triggerSuccess() {
+  if (orbitAchieved) return;
+  orbitAchieved = true;
+  if (currentLevel + 1 > unlockedLevels) {
+    unlockedLevels = currentLevel + 1;
+    localStorage.setItem('lunarAscent_unlocked', unlockedLevels);
+  }
+  setTimeout(() => {
+    showMessage('success', 'ORBIT ACHIEVED', `Level ${currentLevel + 1}: ${LEVELS[currentLevel].name} complete!`, [
+      { label: currentLevel < LEVELS.length - 1 ? 'Next Level' : 'All Done!', fn: () => { hideMessage(); if (currentLevel < LEVELS.length - 1) startLevel(currentLevel + 1); else showLevelSelect(); } },
+      { label: 'Level Select', fn: () => { hideMessage(); showLevelSelect(); } }
+    ]);
+  }, 500);
+}
+
+// ==================== PARTICLES ====================
+function spawnThrustParticles(count) {
+  const backAngle = ship.angle + Math.PI;
+  for (let i = 0; i < count; i++) {
+    const spread = (Math.random() - 0.5) * 0.6;
+    const speed = Math.random() * 2 + 1.5;
+    particles.push({
+      x: ship.x + Math.cos(backAngle) * 10,
+      y: ship.y + Math.sin(backAngle) * 10,
+      vx: Math.cos(backAngle + spread) * speed + ship.vx * 0.3,
+      vy: Math.sin(backAngle + spread) * speed + ship.vy * 0.3,
+      life: PARTICLE_LIFE,
+      maxLife: PARTICLE_LIFE,
+      color: Math.random() > 0.5 ? '#00e5ff' : '#00ffc8',
+      size: Math.random() * 3 + 1
+    });
+  }
+}
+
+function spawnBrakeParticles(count) {
+  const frontAngle = ship.angle;
+  for (let i = 0; i < count; i++) {
+    const spread = (Math.random() - 0.5) * 0.8;
+    const speed = Math.random() * 1.5 + 0.8;
+    particles.push({
+      x: ship.x + Math.cos(frontAngle) * 8,
+      y: ship.y + Math.sin(frontAngle) * 8,
+      vx: Math.cos(frontAngle + spread) * speed + ship.vx * 0.2,
+      vy: Math.sin(frontAngle + spread) * speed + ship.vy * 0.2,
+      life: PARTICLE_LIFE * 0.7,
+      maxLife: PARTICLE_LIFE * 0.7,
+      color: Math.random() > 0.5 ? '#ff6b35' : '#ffd60a',
+      size: Math.random() * 2.5 + 1
+    });
+  }
+}
+
+function spawnTrailParticle() {
+  particles.push({
+    x: ship.x + (Math.random() - 0.5) * 4,
+    y: ship.y + (Math.random() - 0.5) * 4,
+    vx: (Math.random() - 0.5) * 0.3,
+    vy: (Math.random() - 0.5) * 0.3,
+    life: 30,
+    maxLife: 30,
+    color: '#00e5ff',
+    size: Math.random() * 1.5 + 0.5
+  });
+}
+
+function spawnExplosion(x, y) {
+  for (let i = 0; i < 40; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = Math.random() * 5 + 1;
+    particles.push({
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      life: 80,
+      maxLife: 80,
+      color: ['#ff6b35', '#ff2d55', '#ffd60a', '#00e5ff'][Math.floor(Math.random() * 4)],
+      size: Math.random() * 4 + 1
+    });
+  }
+}
+
+function updateParticles() {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.life--;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+}
+
+// ==================== RENDERING ====================
+function render() {
+  ctx.clearRect(0, 0, W, H);
+
+  // Screen shake
+  shakeX = 0; shakeY = 0;
+  if (screenShake > 0) {
+    shakeX = (Math.random() - 0.5) * screenShake;
+    shakeY = (Math.random() - 0.5) * screenShake;
+    screenShake *= 0.85;
+    if (screenShake < 0.5) screenShake = 0;
+  }
+
+  ctx.save();
+  ctx.translate(shakeX, shakeY);
+
+  // Stars
+  renderStars();
+
+  // Orbit bands (visual guide)
+  renderOrbitBands();
+
+  // Trail
+  renderTrail();
+
+  // Particles
+  renderParticles();
+
+  // Bodies
+  planets.forEach(p => renderBody(p));
+
+  // Ship
+  if (ship.alive) renderShip();
+
+  ctx.restore();
+
+  // HUD update
+  updateHUD();
+}
+
+function renderStars() {
+  stars.forEach(s => {
+    const parallax = 0.3;
+    const sx = ((s.x * parallax) % W + W) % W;
+    const sy = ((s.y * parallax) % H + H) % H;
+    const twinkle = Math.sin(frameCount * 0.02 + s.twinkle) * 0.3 + 0.7;
+    const alpha = s.bright * twinkle;
+    ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+    ctx.beginPath();
+    ctx.arc(sx, sy, s.size, 0, Math.PI * 2);
+    ctx.fill();
+  });
+}
+
+function renderOrbitBands() {
+  const lvl = LEVELS[currentLevel];
+  if (!lvl) return;
+  planets.forEach(p => {
+    if (p.type !== 'moon') return;
+    const inner = lvl.orbitBand.inner * scaleFactor;
+    const outer = lvl.orbitBand.outer * scaleFactor;
+
+    ctx.strokeStyle = 'rgba(0, 255, 200, 0.08)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 8]);
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, inner, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, outer, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Success zone glow
+    const success = orbitCheckCounter > 0;
+    if (success) {
+      const alpha = 0.05 + 0.15 * (orbitCheckCounter / ORBIT_CHECK_FRAMES);
+      ctx.fillStyle = `rgba(0, 255, 200, ${alpha})`;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, outer, 0, Math.PI * 2);
+      ctx.arc(p.x, p.y, inner, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  });
+}
+
+function renderTrail() {
+  if (trailPoints.length < 2) return;
+  ctx.lineCap = 'round';
+  for (let i = 1; i < trailPoints.length; i++) {
+    const t = trailPoints[i];
+    const prev = trailPoints[i - 1];
+    const alpha = Math.max(0, 1 - t.age / TRAIL_MAX) * 0.6;
+    const width = (1 - t.age / TRAIL_MAX) * 2.5;
+    ctx.strokeStyle = `rgba(0, 229, 255, ${alpha})`;
+    ctx.lineWidth = width;
+    ctx.beginPath();
+    ctx.moveTo(prev.x, prev.y);
+    ctx.lineTo(t.x, t.y);
+    ctx.stroke();
+  }
+}
+
+function renderParticles() {
+  particles.forEach(p => {
+    const alpha = p.life / p.maxLife;
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = p.color;
+    ctx.shadowColor = p.color;
+    ctx.shadowBlur = 8;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size * alpha, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  ctx.globalAlpha = 1;
+  ctx.shadowBlur = 0;
+}
+
+function renderBody(p) {
+  ctx.save();
+
+  // Glow
+  const gradient = ctx.createRadialGradient(p.x, p.y, p.radius * 0.5, p.x, p.y, p.radius * 2.5);
+  gradient.addColorStop(0, p.glowColor || 'rgba(200,214,229,0.2)');
+  gradient.addColorStop(1, 'transparent');
+  ctx.fillStyle = gradient;
+  ctx.beginPath();
+  ctx.arc(p.x, p.y, p.radius * 2.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Body
+  const bodyGrad = ctx.createRadialGradient(p.x - p.radius * 0.3, p.y - p.radius * 0.3, 0, p.x, p.y, p.radius);
+  if (p.type === 'planet') {
+    bodyGrad.addColorStop(0, '#6a8fc5');
+    bodyGrad.addColorStop(1, '#2a4a7a');
+  } else {
+    bodyGrad.addColorStop(0, lightenColor(p.color, 40));
+    bodyGrad.addColorStop(1, p.color);
+  }
+  ctx.fillStyle = bodyGrad;
+  ctx.beginPath();
+  ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Crater details for planet
+  if (p.type === 'planet') {
+    ctx.fillStyle = 'rgba(0,0,0,0.15)';
+    for (let i = 0; i < 5; i++) {
+      const cx = p.x + Math.cos(i * 1.3) * p.radius * 0.4;
+      const cy = p.y + Math.sin(i * 1.3) * p.radius * 0.4;
+      ctx.beginPath();
+      ctx.arc(cx, cy, p.radius * 0.12, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // Moon glow ring
+  if (p.type === 'moon') {
+    ctx.strokeStyle = p.glowColor || 'rgba(200,214,229,0.2)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.radius + 3, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+function renderShip() {
+  ctx.save();
+  ctx.translate(ship.x, ship.y);
+  ctx.rotate(ship.angle);
+
+  // Thrust glow
+  if (keys['ArrowUp'] || keys['KeyW'] || keys['w']) {
+    const thrustGrad = ctx.createRadialGradient(-12, 0, 0, -12, 0, 25);
+    thrustGrad.addColorStop(0, 'rgba(0, 229, 255, 0.6)');
+    thrustGrad.addColorStop(1, 'transparent');
+    ctx.fillStyle = thrustGrad;
+    ctx.beginPath();
+    ctx.arc(-12, 0, 25, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Ship body (triangle)
+  ctx.fillStyle = '#e8f4f8';
+  ctx.strokeStyle = '#00e5ff';
+  ctx.lineWidth = 1.5;
+  ctx.shadowColor = '#00e5ff';
+  ctx.shadowBlur = 10;
+  ctx.beginPath();
+  ctx.moveTo(14, 0);
+  ctx.lineTo(-8, -7);
+  ctx.lineTo(-5, 0);
+  ctx.lineTo(-8, 7);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+function lightenColor(hex, amount) {
+  const num = parseInt(hex.replace('#', ''), 16);
+  const r = Math.min(255, (num >> 16) + amount);
+  const g = Math.min(255, ((num >> 8) & 0x00FF) + amount);
+  const b = Math.min(255, (num & 0x0000FF) + amount);
+  return `rgb(${r},${g},${b})`;
+}
+
+// ==================== HUD ====================
+function updateHUD() {
+  if (gameState !== 'playing') return;
+  const lvl = LEVELS[currentLevel];
+
+  // Fuel
+  const fuelPct = Math.max(0, ship.fuel / ship.maxFuel) * 100;
+  const fuelBar = document.getElementById('fuel-bar');
+  fuelBar.style.width = fuelPct + '%';
+  fuelBar.className = 'gauge-fill' + (fuelPct < 15 ? ' low critical' : fuelPct < 30 ? ' low' : '');
+
+  // Find nearest moon
+  let nearestMoon = null;
+  let nearestDist = Infinity;
+  planets.forEach(p => {
+    if (p.type !== 'moon') return;
+    const dx = ship.x - p.x;
+    const dy = ship.y - p.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < nearestDist) {
+      nearestDist = dist;
+      nearestMoon = p;
+    }
+  });
+
+  // Altitude
+  if (nearestMoon) {
+    const altitude = Math.max(0, nearestDist - nearestMoon.radius);
+    document.getElementById('hud-alt').textContent = Math.round(altitude / scaleFactor) + ' km';
+  } else {
+    document.getElementById('hud-alt').textContent = '—';
+  }
+
+  // Velocity
+  const speed = Math.sqrt(ship.vx * ship.vx + ship.vy * ship.vy);
+  document.getElementById('hud-vel').textContent = speed.toFixed(1) + ' m/s';
+
+  if (nearestMoon) {
+    const orbitalVel = Math.sqrt(G * nearestMoon.mass / nearestDist);
+    document.getElementById('hud-vel-needed').textContent = 'orbit: ' + orbitalVel.toFixed(1);
+    const velEl = document.getElementById('hud-vel');
+    const diff = speed - orbitalVel;
+    velEl.className = 'current' + (Math.abs(diff) < orbitalVel * 0.3 ? ' success' : diff > orbitalVel ? ' danger' : '');
+  }
+
+  // Level
+  document.getElementById('hud-level').textContent = `LEVEL ${currentLevel + 1}`;
+
+  // Status
+  const statusEl = document.getElementById('hud-status');
+  if (orbitAchieved) {
+    statusEl.textContent = 'ORBITING ✓';
+    statusEl.className = 'hud-value success';
+  } else if (orbitCheckCounter > 0) {
+    statusEl.textContent = `STABILIZING ${Math.round(100 * orbitCheckCounter / ORBIT_CHECK_FRAMES)}%`;
+    statusEl.className = 'hud-value success';
+  } else if (ship.fuel <= 0) {
+    statusEl.textContent = 'NO FUEL';
+    statusEl.className = 'hud-value danger';
+  } else {
+    statusEl.textContent = 'MANEUVERING';
+    statusEl.className = 'hud-value';
+  }
+}
+
+// ==================== UI ====================
+function showTitle() {
+  gameState = 'title';
+  document.getElementById('title-screen').classList.add('active');
+  document.getElementById('level-screen').classList.remove('active');
+  document.getElementById('hud').classList.remove('active');
+  document.getElementById('hud-restart').style.display = 'none';
+}
+window.showTitle = showTitle;
+
+function showLevelSelect() {
+  gameState = 'levelSelect';
+  document.getElementById('title-screen').classList.remove('active');
+  document.getElementById('level-screen').classList.add('active');
+  document.getElementById('hud').classList.remove('active');
+  document.getElementById('hud-restart').style.display = 'none';
+
+  const grid = document.getElementById('level-grid');
+  grid.innerHTML = '';
+  LEVELS.forEach((lvl, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'level-btn' + (i >= unlockedLevels ? ' locked' : '');
+    btn.innerHTML = `<span class="lvl-num">${i + 1}</span><span class="lvl-name">${lvl.name}</span>`;
+    if (i < unlockedLevels) {
+      btn.onclick = () => startLevel(i);
+    }
+    grid.appendChild(btn);
+  });
+}
+window.showLevelSelect = showLevelSelect;
+
+function startLevel(idx) {
+  gameState = 'playing';
+  document.getElementById('title-screen').classList.remove('active');
+  document.getElementById('level-screen').classList.remove('active');
+  document.getElementById('hud').classList.add('active');
+  document.getElementById('hud-restart').style.display = 'block';
+  initStars();
+  initLevel(idx);
+}
+window.startLevel = startLevel;
+
+function restartLevel() {
+  startLevel(currentLevel);
+}
+window.restartLevel = restartLevel;
+
+function showMessage(type, title, desc, buttons) {
+  const overlay = document.getElementById('msg-overlay');
+  const box = document.getElementById('msg-box');
+  box.className = 'msg-box ' + type;
+  document.getElementById('msg-title').textContent = title;
+  document.getElementById('msg-desc').textContent = desc;
+  const btnContainer = document.getElementById('msg-buttons');
+  btnContainer.innerHTML = '';
+  buttons.forEach(b => {
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-small' + (type === 'failure' ? ' btn-danger' : '');
+    btn.innerHTML = `<span>${b.label}</span>`;
+    btn.onclick = b.fn;
+    btnContainer.appendChild(btn);
+  });
+  overlay.classList.add('active');
+}
+window.showMessage = showMessage;
+
+function hideMessage() {
+  document.getElementById('msg-overlay').classList.remove('active');
+}
+window.hideMessage = hideMessage;
+
+// ==================== GAME LOOP ====================
+function gameLoop() {
+  frameCount++;
+  if (gameState === 'playing') {
+    updatePhysics();
+    updateParticles();
+  }
+  render();
+  requestAnimationFrame(gameLoop);
+}
+
+// ==================== BOOT ====================
+resize();
+initStars();
+gameLoop();
+</script>
+</body>
+</html>
