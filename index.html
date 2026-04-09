@@ -383,8 +383,9 @@ function initLevel(lvlIdx) {
   // Ship start (on planet surface, launchpad style)
   const startX = planetX;
   const startY = planetY - lvl.planet.radius * scaleFactor;
+  // Give ship a small upward launch velocity so gravity doesn't instantly crash it into the planet
   const startVX = 0;
-  const startVY = 0;
+  const startVY = -1.5;
 
   ship = {
     x: startX, y: startY,
