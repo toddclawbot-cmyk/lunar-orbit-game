@@ -395,7 +395,8 @@ function initLevel(lvlIdx) {
     maxFuel: lvl.fuel,
     alive: true,
     crashed: false,
-    fuelEmptyTime: null
+    fuelEmptyTime: null,
+    landed: true
   };
 
   planets = [];
@@ -456,6 +457,16 @@ function scalePositions() {
 function updatePhysics() {
   if (!ship.alive || gameState !== 'playing') return;
 
+  // Ship sits on planet surface until player presses UP to launch
+  if (ship.landed) {
+    // Check for launch input
+    if (keys['ArrowUp'] || keys['KeyW'] || keys['w'] || keys['W']) {
+      ship.landed = false;
+    } else {
+      return; // Stay frozen on surface
+    }
+  }
+
   const dt = 1;
 
   // Moon movement
@@ -485,7 +496,7 @@ function updatePhysics() {
 
   // Input
   let thrusting = false;
-  if ((keys['ArrowUp'] || keys['KeyW'] || keys['w'] || keys['W'] || keys['ArrowUp']) && ship.fuel > 0) {
+  if ((keys['ArrowUp'] || keys['KeyW'] || keys['w'] || keys['W']) && ship.fuel > 0) {
     ship.vx += Math.cos(ship.angle) * THRUST_POWER;
     ship.vy += Math.sin(ship.angle) * THRUST_POWER;
     ship.fuel -= 0.15;
@@ -966,15 +977,18 @@ function updateHUD() {
 
   // Status
   const statusEl = document.getElementById('hud-status');
-  if (orbitAchieved) {
+  if (!ship.landed && orbitAchieved) {
     statusEl.textContent = 'ORBITING ✓';
     statusEl.className = 'hud-value success';
-  } else if (orbitCheckCounter > 0) {
+  } else if (!ship.landed && orbitCheckCounter > 0) {
     statusEl.textContent = `STABILIZING ${Math.round(100 * orbitCheckCounter / ORBIT_CHECK_FRAMES)}%`;
     statusEl.className = 'hud-value success';
-  } else if (ship.fuel <= 0) {
+  } else if (!ship.landed && ship.fuel <= 0) {
     statusEl.textContent = 'NO FUEL';
     statusEl.className = 'hud-value danger';
+  } else if (ship.landed) {
+    statusEl.textContent = 'PRESS ↑ TO LAUNCH';
+    statusEl.className = 'hud-value';
   } else {
     statusEl.textContent = 'MANEUVERING';
     statusEl.className = 'hud-value';
