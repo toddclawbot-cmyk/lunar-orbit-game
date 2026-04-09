@@ -269,11 +269,11 @@ window.addEventListener('resize', () => { resize(); if (gameState === 'playing')
 const LEVELS = [
   {
     name: 'Training Moon',
-    planet: { radius: 60, mass: 5e4, color: '#4a6fa5' },
-    moon: { radius: 20, mass: 3e3, color: '#c8d6e5', orbitRadius: 220, angle: 0, angularVel: 0, glowColor: 'rgba(200,214,229,0.3)' },
+    planet: { radius: 90, mass: 8e4, color: '#4a6fa5' },
+    moon: { radius: 20, mass: 3e3, color: '#c8d6e5', orbitRadius: 240, angle: 0, angularVel: 0, glowColor: 'rgba(200,214,229,0.3)' },
     shipStart: { x: 0, y: 0, vx: 0, vy: 0, angle: -Math.PI/2 },
-    fuel: 120,
-    orbitBand: { inner: 22, outer: 45 },
+    fuel: 150,
+    orbitBand: { inner: 24, outer: 50 },
     description: 'Static moon, close orbit. Learn the basics.'
   },
   {
@@ -380,11 +380,11 @@ function initLevel(lvlIdx) {
   offsetX = W / 2;
   offsetY = H / 2;
 
-  // Ship start (on planet surface, going up)
+  // Ship start (above planet surface, launched upward)
   const startX = planetX;
-  const startY = planetY - lvl.planet.radius * scaleFactor;
-  const startVX = Math.sqrt(G * lvl.planet.mass / (lvl.planet.radius * scaleFactor)) * 0.4; // small horizontal push
-  const startVY = 0;
+  const startY = planetY - lvl.planet.radius * scaleFactor - 15;
+  const startVX = 0;
+  const startVY = 22;
 
   ship = {
     x: startX, y: startY,
