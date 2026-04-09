@@ -270,49 +270,49 @@ const LEVELS = [
   {
     name: 'Training Moon',
     planet: { radius: 90, mass: 8e4, color: '#4a6fa5' },
-    moon: { radius: 20, mass: 3e3, color: '#c8d6e5', orbitRadius: 240, angle: 0, angularVel: 0, glowColor: 'rgba(200,214,229,0.3)' },
+    moon: { radius: 20, mass: 3e3, color: '#c8d6e5', orbitRadius: 320, angle: 0, angularVel: 0.0002, glowColor: 'rgba(200,214,229,0.3)' },
     shipStart: { x: 0, y: 0, vx: 0, vy: 0, angle: -Math.PI/2 },
     fuel: 150,
-    orbitBand: { inner: 24, outer: 50 },
-    description: 'Static moon, close orbit. Learn the basics.'
+    orbitBand: { inner: 26, outer: 55 },
+    description: 'Distant moon in orbit. Learn the basics.'
   },
   {
     name: 'Drifting Rock',
     planet: { radius: 60, mass: 5e4, color: '#4a6fa5' },
-    moon: { radius: 18, mass: 2500, color: '#a0a0b0', orbitRadius: 300, angle: 0, angularVel: 0, glowColor: 'rgba(160,160,176,0.3)' },
+    moon: { radius: 18, mass: 2500, color: '#a0a0b0', orbitRadius: 380, angle: 0, angularVel: 0.00025, glowColor: 'rgba(160,160,176,0.3)' },
     shipStart: { x: 0, y: 0, vx: 0, vy: 0, angle: -Math.PI/2 },
     fuel: 80,
-    orbitBand: { inner: 20, outer: 40 },
+    orbitBand: { inner: 22, outer: 44 },
     description: 'Farther moon, less fuel. Precision required.'
   },
   {
     name: 'Wandering Moon',
     planet: { radius: 60, mass: 5e4, color: '#4a6fa5' },
-    moon: { radius: 20, mass: 2800, color: '#d4a574', orbitRadius: 260, angle: 0, angularVel: 0.0003, glowColor: 'rgba(212,165,116,0.3)' },
+    moon: { radius: 20, mass: 2800, color: '#d4a574', orbitRadius: 360, angle: 0, angularVel: 0.0003, glowColor: 'rgba(212,165,116,0.3)' },
     shipStart: { x: 0, y: 0, vx: 0, vy: 0, angle: -Math.PI/2 },
     fuel: 95,
-    orbitBand: { inner: 22, outer: 44 },
+    orbitBand: { inner: 24, outer: 48 },
     description: 'Moon drifts slowly. Time your approach.'
   },
   {
     name: 'Binary System',
     planet: { radius: 55, mass: 5e4, color: '#4a6fa5' },
     moons: [
-      { radius: 16, mass: 2000, color: '#7ec8e3', orbitRadius: 200, angle: 0, angularVel: 0.0004, glowColor: 'rgba(126,200,227,0.3)' },
-      { radius: 14, mass: 1600, color: '#e3c87e', orbitRadius: 320, angle: Math.PI, angularVel: -0.0003, glowColor: 'rgba(227,200,126,0.3)' }
+      { radius: 16, mass: 2000, color: '#7ec8e3', orbitRadius: 280, angle: 0, angularVel: 0.0004, glowColor: 'rgba(126,200,227,0.3)' },
+      { radius: 14, mass: 1600, color: '#e3c87e', orbitRadius: 420, angle: Math.PI, angularVel: -0.0003, glowColor: 'rgba(227,200,126,0.3)' }
     ],
     shipStart: { x: 0, y: 0, vx: 0, vy: 0, angle: -Math.PI/2 },
     fuel: 110,
-    orbitBand: { inner: 18, outer: 36 },
+    orbitBand: { inner: 20, outer: 40 },
     description: 'Two moons, navigate between gravity wells.'
   },
   {
     name: 'The Gauntlet',
     planet: { radius: 60, mass: 5e4, color: '#4a6fa5' },
-    moon: { radius: 15, mass: 2200, color: '#ff6b6b', orbitRadius: 380, angle: 0, angularVel: 0.0008, glowColor: 'rgba(255,107,107,0.3)' },
+    moon: { radius: 15, mass: 2200, color: '#ff6b6b', orbitRadius: 460, angle: 0, angularVel: 0.0008, glowColor: 'rgba(255,107,107,0.3)' },
     shipStart: { x: 0, y: 0, vx: 0, vy: 0, angle: -Math.PI/2 },
     fuel: 70,
-    orbitBand: { inner: 17, outer: 30 },
+    orbitBand: { inner: 18, outer: 34 },
     description: 'Fast moon, minimal fuel, tight orbit.'
   }
 ];
@@ -323,6 +323,13 @@ let currentLevel = 0;
 let unlockedLevels = parseInt(localStorage.getItem('lunarAscent_unlocked') || '1');
 let scaleFactor = 1;
 let offsetX = 0, offsetY = 0;
+
+// ==================== CAMERA ====================
+let camX = 0, camY = 0;       // current camera position (world coords)
+let camZoom = 1;              // current zoom
+const CAM_LERP = 0.08;        // camera smoothing speed
+const BASE_ZOOM = 1.0;        // default zoom when close
+const MIN_ZOOM = 0.35;         // most zoomed out
 let shakeAmount = 0;
 let shakeX = 0, shakeY = 0;
 let screenShake = 0;
@@ -354,10 +361,10 @@ let orbitAchieved = false;
 // ==================== INITIALIZATION ====================
 function initStars() {
   stars = [];
-  for (let i = 0; i < 300; i++) {
+  for (let i = 0; i < 600; i++) {
     stars.push({
-      x: Math.random() * 4000 - 2000,
-      y: Math.random() * 4000 - 2000,
+      x: Math.random() * 12000 - 6000,
+      y: Math.random() * 12000 - 6000,
       size: Math.random() * 2 + 0.3,
       bright: Math.random(),
       twinkle: Math.random() * Math.PI * 2
@@ -376,9 +383,14 @@ function initLevel(lvlIdx) {
   const planetX = W / 2;
   const planetY = H / 2;
 
-  scaleFactor = Math.min(W, H) / 700;
+  scaleFactor = Math.min(W, H) / 500;
   offsetX = W / 2;
   offsetY = H / 2;
+
+  // Initialize camera to planet center
+  camX = planetX;
+  camY = planetY;
+  camZoom = BASE_ZOOM;
 
   // Ship start (on planet surface, launchpad style)
   const startX = planetX;
@@ -649,13 +661,13 @@ function spawnThrustParticles(count) {
     const spread = (Math.random() - 0.5) * 0.6;
     const speed = Math.random() * 2 + 1.5;
     particles.push({
-      x: ship.x + Math.cos(backAngle) * 10,
-      y: ship.y + Math.sin(backAngle) * 10,
+      x: ship.x + Math.cos(backAngle) * 18,
+      y: ship.y + Math.sin(backAngle) * 18,
       vx: Math.cos(backAngle + spread) * speed + ship.vx * 0.3,
       vy: Math.sin(backAngle + spread) * speed + ship.vy * 0.3,
       life: PARTICLE_LIFE,
       maxLife: PARTICLE_LIFE,
-      color: Math.random() > 0.5 ? '#00e5ff' : '#00ffc8',
+      color: ['#ff9933', '#ff6622', '#ffcc44', '#ff4411'][Math.floor(Math.random() * 4)],
       size: Math.random() * 3 + 1
     });
   }
@@ -687,7 +699,7 @@ function spawnTrailParticle() {
     vy: (Math.random() - 0.5) * 0.3,
     life: 30,
     maxLife: 30,
-    color: '#00e5ff',
+    color: '#aabbcc',
     size: Math.random() * 1.5 + 0.5
   });
 }
@@ -702,7 +714,7 @@ function spawnExplosion(x, y) {
       vy: Math.sin(angle) * speed,
       life: 80,
       maxLife: 80,
-      color: ['#ff6b35', '#ff2d55', '#ffd60a', '#00e5ff'][Math.floor(Math.random() * 4)],
+      color: ['#ff6b35', '#ff9933', '#ffd60a', '#ff4422', '#ffcc88'][Math.floor(Math.random() * 5)],
       size: Math.random() * 4 + 1
     });
   }
@@ -719,6 +731,27 @@ function updateParticles() {
 }
 
 // ==================== RENDERING ====================
+function updateCamera() {
+  if (gameState !== 'playing') return;
+
+  // Target: ship position
+  const targetX = ship.x;
+  const targetY = ship.y;
+
+  // Smooth follow
+  camX += (targetX - camX) * CAM_LERP;
+  camY += (targetY - camY) * CAM_LERP;
+
+  // Dynamic zoom based on distance from planet center
+  const planet = planets.find(p => p.type === 'planet');
+  if (planet) {
+    const dist = Math.sqrt((ship.x - planet.x) ** 2 + (ship.y - planet.y) ** 2);
+    const maxDist = planet.radius * 8;
+    const zoomTarget = Math.max(MIN_ZOOM, BASE_ZOOM - (dist / maxDist) * (BASE_ZOOM - MIN_ZOOM));
+    camZoom += (zoomTarget - camZoom) * 0.05;
+  }
+}
+
 function render() {
   ctx.clearRect(0, 0, W, H);
 
@@ -731,13 +764,21 @@ function render() {
     if (screenShake < 0.5) screenShake = 0;
   }
 
-  ctx.save();
-  ctx.translate(shakeX, shakeY);
+  // Update camera
+  updateCamera();
 
-  // Stars
+  // Compute world-to-screen transform
+  const camOffsetX = W / 2 - camX * camZoom;
+  const camOffsetY = H / 2 - camY * camZoom;
+
+  ctx.save();
+  ctx.translate(camOffsetX + shakeX, camOffsetY + shakeY);
+  ctx.scale(camZoom, camZoom);
+
+  // Stars (parallax — move slower than world)
   renderStars();
 
-  // Orbit bands (visual guide)
+  // Orbit bands
   renderOrbitBands();
 
   // Trail
@@ -760,14 +801,15 @@ function render() {
 
 function renderStars() {
   stars.forEach(s => {
-    const parallax = 0.3;
-    const sx = ((s.x * parallax) % W + W) % W;
-    const sy = ((s.y * parallax) % H + H) % H;
+    // Stars live in world space — parallax makes them shift slower than the world
+    const parallax = 0.15;
+    const px = s.x - camX * parallax;
+    const py = s.y - camY * parallax;
     const twinkle = Math.sin(frameCount * 0.02 + s.twinkle) * 0.3 + 0.7;
     const alpha = s.bright * twinkle;
     ctx.fillStyle = `rgba(255,255,255,${alpha})`;
     ctx.beginPath();
-    ctx.arc(sx, sy, s.size, 0, Math.PI * 2);
+    ctx.arc(px, py, s.size, 0, Math.PI * 2);
     ctx.fill();
   });
 }
@@ -810,9 +852,9 @@ function renderTrail() {
   for (let i = 1; i < trailPoints.length; i++) {
     const t = trailPoints[i];
     const prev = trailPoints[i - 1];
-    const alpha = Math.max(0, 1 - t.age / TRAIL_MAX) * 0.6;
-    const width = (1 - t.age / TRAIL_MAX) * 2.5;
-    ctx.strokeStyle = `rgba(0, 229, 255, ${alpha})`;
+    const alpha = Math.max(0, 1 - t.age / TRAIL_MAX) * 0.5;
+    const width = (1 - t.age / TRAIL_MAX) * 2;
+    ctx.strokeStyle = `rgba(160, 180, 200, ${alpha})`;
     ctx.lineWidth = width;
     ctx.beginPath();
     ctx.moveTo(prev.x, prev.y);
@@ -891,33 +933,185 @@ function renderShip() {
   ctx.translate(ship.x, ship.y);
   ctx.rotate(ship.angle);
 
-  // Thrust glow
-  if (keys['ArrowUp'] || keys['KeyW'] || keys['w']) {
-    const thrustGrad = ctx.createRadialGradient(-12, 0, 0, -12, 0, 25);
-    thrustGrad.addColorStop(0, 'rgba(0, 229, 255, 0.6)');
-    thrustGrad.addColorStop(1, 'transparent');
-    ctx.fillStyle = thrustGrad;
+  const isThrusting = keys['ArrowUp'] || keys['KeyW'] || keys['w'] || keys['W'];
+
+  // ── Engine block (rear) ──
+  ctx.fillStyle = '#3a3a4a';
+  ctx.strokeStyle = '#5a5a6a';
+  ctx.lineWidth = 1;
+  roundRect(ctx, -16, -5, 10, 10, 2);
+  ctx.fill();
+  ctx.stroke();
+
+  // Exhaust nozzle
+  ctx.fillStyle = '#2a2a3a';
+  ctx.beginPath();
+  ctx.moveTo(-16, -4);
+  ctx.lineTo(-20, -6);
+  ctx.lineTo(-20, 6);
+  ctx.lineTo(-16, 4);
+  ctx.closePath();
+  ctx.fill();
+
+  // Thrust flame
+  if (isThrusting) {
+    const flameLen = 18 + Math.random() * 10;
+    const grad = ctx.createLinearGradient(-16, 0, -16 - flameLen, 0);
+    grad.addColorStop(0, 'rgba(255, 180, 60, 0.95)');
+    grad.addColorStop(0.4, 'rgba(255, 100, 30, 0.8)');
+    grad.addColorStop(1, 'rgba(255, 50, 10, 0)');
+    ctx.fillStyle = grad;
     ctx.beginPath();
-    ctx.arc(-12, 0, 25, 0, Math.PI * 2);
+    ctx.moveTo(-16, -3);
+    ctx.lineTo(-16 - flameLen, 0);
+    ctx.lineTo(-16, 3);
+    ctx.closePath();
     ctx.fill();
+
+    // Inner bright core
+    ctx.fillStyle = 'rgba(255, 240, 180, 0.9)';
+    ctx.beginPath();
+    ctx.moveTo(-16, -1.5);
+    ctx.lineTo(-16 - flameLen * 0.5, 0);
+    ctx.lineTo(-16, 1.5);
+    ctx.closePath();
+    ctx.fill();
+
+    // Glow
+    ctx.shadowColor = '#ff9933';
+    ctx.shadowBlur = 20;
+    ctx.fillStyle = 'rgba(255, 150, 50, 0.3)';
+    ctx.beginPath();
+    ctx.arc(-16 - flameLen * 0.3, 0, 8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
   }
 
-  // Ship body (triangle)
-  ctx.fillStyle = '#e8f4f8';
-  ctx.strokeStyle = '#00e5ff';
+  // ── Main hull (capsule-ish body) ──
+  const hullGrad = ctx.createLinearGradient(0, -8, 0, 8);
+  hullGrad.addColorStop(0, '#c8d4e0');
+  hullGrad.addColorStop(0.4, '#8a9aaa');
+  hullGrad.addColorStop(1, '#5a6a7a');
+  ctx.fillStyle = hullGrad;
+  ctx.strokeStyle = '#aabbcc';
   ctx.lineWidth = 1.5;
-  ctx.shadowColor = '#00e5ff';
-  ctx.shadowBlur = 10;
   ctx.beginPath();
-  ctx.moveTo(14, 0);
-  ctx.lineTo(-8, -7);
-  ctx.lineTo(-5, 0);
-  ctx.lineTo(-8, 7);
+  ctx.moveTo(18, 0);
+  ctx.lineTo(14, -6);
+  ctx.lineTo(-6, -6);
+  ctx.lineTo(-12, -4);
+  ctx.lineTo(-12, 4);
+  ctx.lineTo(-6, 6);
+  ctx.lineTo(14, 6);
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
 
+  // Hull panel line
+  ctx.strokeStyle = 'rgba(100, 130, 160, 0.4)';
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  ctx.moveTo(10, -6);
+  ctx.lineTo(10, 6);
+  ctx.stroke();
+
+  // Rivets
+  ctx.fillStyle = '#aabbcc';
+  [[6, -4], [6, 4], [0, -4], [0, 4]].forEach(([rx, ry]) => {
+    ctx.beginPath();
+    ctx.arc(rx, ry, 1, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // ── Cockpit window ──
+  const cockpitGrad = ctx.createRadialGradient(13, -1, 0, 13, -1, 5);
+  cockpitGrad.addColorStop(0, 'rgba(100, 230, 220, 0.9)');
+  cockpitGrad.addColorStop(0.6, 'rgba(40, 180, 200, 0.7)');
+  cockpitGrad.addColorStop(1, 'rgba(20, 100, 140, 0.5)');
+  ctx.fillStyle = cockpitGrad;
+  ctx.strokeStyle = 'rgba(0, 229, 255, 0.6)';
+  ctx.lineWidth = 1;
+  ctx.shadowColor = '#00e5ff';
+  ctx.shadowBlur = 8;
+  ctx.beginPath();
+  ctx.ellipse(13, -1, 5, 4, -0.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Cockpit reflection
+  ctx.fillStyle = 'rgba(255,255,255,0.3)';
+  ctx.beginPath();
+  ctx.ellipse(15, -2.5, 1.5, 1, 0.3, 0, Math.PI * 2);
+  ctx.fill();
+
+  // ── Wing fins ──
+  ctx.fillStyle = '#7a8a9a';
+  ctx.strokeStyle = '#9aabbb';
+  ctx.lineWidth = 1;
+  // Top fin
+  ctx.beginPath();
+  ctx.moveTo(4, -6);
+  ctx.lineTo(-2, -10);
+  ctx.lineTo(-8, -9);
+  ctx.lineTo(-6, -6);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  // Bottom fin
+  ctx.beginPath();
+  ctx.moveTo(4, 6);
+  ctx.lineTo(-2, 10);
+  ctx.lineTo(-8, 9);
+  ctx.lineTo(-6, 6);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // ── Antenna ──
+  ctx.strokeStyle = '#aabbcc';
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  ctx.moveTo(8, -6);
+  ctx.lineTo(8, -11);
+  ctx.stroke();
+  ctx.fillStyle = '#ff6b35';
+  ctx.shadowColor = '#ff6b35';
+  ctx.shadowBlur = 4;
+  ctx.beginPath();
+  ctx.arc(8, -11, 1.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  // ── Brake thrust (rear vents) ──
+  const isBraking = (keys['ArrowDown'] || keys['KeyS'] || keys['s'] || keys['S']) && ship.fuel > 0;
+  if (isBraking) {
+    ctx.fillStyle = 'rgba(255, 107, 53, 0.8)';
+    ctx.beginPath();
+    ctx.arc(16, 0, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowColor = '#ff6b35';
+    ctx.shadowBlur = 12;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+
   ctx.restore();
+}
+
+// Rounded rect helper (polyfill for older browsers)
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
 }
 
 function lightenColor(hex, amount) {
