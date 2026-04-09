@@ -380,11 +380,11 @@ function initLevel(lvlIdx) {
   offsetX = W / 2;
   offsetY = H / 2;
 
-  // Ship start (above planet surface, launched upward)
+  // Ship start (on planet surface, launchpad style)
   const startX = planetX;
-  const startY = planetY - lvl.planet.radius * scaleFactor - 15;
+  const startY = planetY - lvl.planet.radius * scaleFactor;
   const startVX = 0;
-  const startVY = 22;
+  const startVY = 0;
 
   ship = {
     x: startX, y: startY,
