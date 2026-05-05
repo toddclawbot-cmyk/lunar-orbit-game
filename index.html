@@ -158,6 +158,88 @@ canvas { display: block; }
   position: fixed; bottom: 20px; right: 20px;
   font-size: 0.65rem;
 }
+
+/* ==================== MOBILE CONTROLS ==================== */
+#mobile-controls {
+  display: none;
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  height: 180px;
+  pointer-events: none;
+  z-index: 50;
+}
+#mobile-controls.visible { display: flex; }
+
+.ctrl-cluster {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  pointer-events: all;
+  padding: 16px;
+}
+.ctrl-cluster.left { position: absolute; left: 0; bottom: 0; }
+.ctrl-cluster.right { position: absolute; right: 0; bottom: 0; }
+
+.mobile-btn {
+  background: rgba(8, 12, 28, 0.85);
+  border: 2px solid var(--accent-cyan);
+  color: var(--accent-cyan);
+  font-family: 'Orbitron', monospace;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.1s, box-shadow 0.1s;
+  -webkit-tap-highlight-color: transparent;
+}
+.mobile-btn:active, .mobile-btn.pressed {
+  background: rgba(0, 229, 255, 0.25);
+  box-shadow: var(--glow-cyan);
+}
+.mobile-btn.brake {
+  border-color: var(--accent-orange);
+  color: var(--accent-orange);
+  width: 70px;
+  height: 70px;
+}
+.mobile-btn.brake:active, .mobile-btn.brake.pressed {
+  background: rgba(255, 107, 53, 0.25);
+  box-shadow: var(--glow-orange);
+}
+.mobile-btn.thrust {
+  border-color: var(--accent-teal);
+  color: var(--accent-teal);
+  width: 80px;
+  height: 80px;
+}
+.mobile-btn.thrust:active, .mobile-btn.thrust.pressed {
+  background: rgba(0, 255, 200, 0.25);
+  box-shadow: var(--glow-teal);
+}
+.mobile-btn.rotate {
+  width: 70px;
+  height: 52px;
+}
+.mobile-btn-label {
+  font-size: 0.6rem;
+  display: block;
+  margin-top: 2px;
+  opacity: 0.7;
+}
+.rotate-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
 .vel-comparison {
   display: flex; gap: 8px; align-items: center;
   font-size: 0.75rem;
@@ -253,6 +335,28 @@ canvas { display: block; }
   </div>
 </div>
 <button class="btn btn-small btn-danger" id="hud-restart" onclick="restartLevel()" style="display:none;">Restart</button>
+
+<!-- Mobile touch controls -->
+<div id="mobile-controls">
+  <div class="ctrl-cluster left">
+    <button class="mobile-btn rotate" id="mob-left">
+      ◀ LEFT
+    </button>
+    <div class="rotate-row">
+      <button class="mobile-btn rotate" id="mob-right">
+        RIGHT ▶
+      </button>
+    </div>
+  </div>
+  <div class="ctrl-cluster right">
+    <button class="mobile-btn thrust" id="mob-thrust">
+      ▲ THRUST
+    </button>
+    <button class="mobile-btn brake" id="mob-brake">
+      ■ BRAKE
+    </button>
+  </div>
+</div>
 <script>
 // ==================== GAME ENGINE ====================
 const canvas = document.getElementById('c');
@@ -359,6 +463,36 @@ let orbitCheckCounter = 0;
 let orbitAchieved = false;
 
 // ==================== INITIALIZATION ====================
+// ==================== MOBILE CONTROLS ====================
+function isMobileDevice() {
+  return /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+    (navigator.maxTouchPoints && navigator.maxTouchPoints > 2);
+}
+
+let mobileKeys = { up: false, down: false, left: false, right: false };
+
+function setupMobileControls() {
+  const controls = document.getElementById('mobile-controls');
+  if (!isMobileDevice()) return;
+  controls.classList.add('visible');
+
+  const makeBtn = (id, key, label, sublabel) => {
+    const btn = document.getElementById(id);
+    const set = (active) => {
+      mobileKeys[key] = active;
+      btn.classList.toggle('pressed', active);
+    };
+    btn.addEventListener('touchstart', e => { e.preventDefault(); set(true); }, { passive: false });
+    btn.addEventListener('touchend', e => { e.preventDefault(); set(false); }, { passive: false });
+    btn.addEventListener('touchcancel', e => { e.preventDefault(); set(false); }, { passive: false });
+  };
+
+  makeBtn('mob-thrust', 'up', 'THRUST');
+  makeBtn('mob-brake', 'down', 'BRAKE');
+  makeBtn('mob-left', 'left', 'LEFT');
+  makeBtn('mob-right', 'right', 'RIGHT');
+}
+
 function initStars() {
   stars = [];
   for (let i = 0; i < 600; i++) {
@@ -470,13 +604,26 @@ function scalePositions() {
 }
 
 // ==================== PHYSICS ====================
+// Input helper — merges keyboard + mobile
+function isInputDown(key) {
+  const k = key;
+  return keys['ArrowUp'] || keys['KeyW'] || keys['w'] || keys['W'] || mobileKeys.up && k === 'up' ||
+         keys['ArrowDown'] || keys['KeyS'] || keys['s'] || keys['S'] || mobileKeys.down && k === 'down' ||
+         keys['ArrowLeft'] || keys['KeyA'] || keys['a'] || keys['A'] || mobileKeys.left && k === 'left' ||
+         keys['ArrowRight'] || keys['KeyD'] || keys['d'] || keys['D'] || mobileKeys.right && k === 'right';
+}
+function isThrustInput() { return keys['ArrowUp'] || keys['KeyW'] || keys['w'] || keys['W'] || mobileKeys.up; }
+function isBrakeInput() { return keys['ArrowDown'] || keys['KeyS'] || keys['s'] || keys['S'] || mobileKeys.down; }
+function isLeftInput() { return keys['ArrowLeft'] || keys['KeyA'] || keys['a'] || keys['A'] || mobileKeys.left; }
+function isRightInput() { return keys['ArrowRight'] || keys['KeyD'] || keys['d'] || keys['D'] || mobileKeys.right; }
+
 function updatePhysics() {
   if (!ship.alive || gameState !== 'playing') return;
 
   // Ship sits on planet surface until player presses UP to launch
   if (ship.landed) {
     // Check for launch input
-    if (keys['ArrowUp'] || keys['KeyW'] || keys['w'] || keys['W']) {
+    if (isThrustInput()) {
       ship.landed = false;
       ship.launchGrace = 15; // 15-frame grace period — no crash detection while ascending
     } else {
@@ -516,24 +663,24 @@ function updatePhysics() {
 
   // Input
   let thrusting = false;
-  if ((keys['ArrowUp'] || keys['KeyW'] || keys['w'] || keys['W']) && ship.fuel > 0) {
+  if (isThrustInput() && ship.fuel > 0) {
     ship.vx += Math.cos(ship.angle) * THRUST_POWER;
     ship.vy += Math.sin(ship.angle) * THRUST_POWER;
     ship.fuel -= 0.15;
     thrusting = true;
     spawnThrustParticles(1);
   }
-  if ((keys['ArrowDown'] || keys['KeyS'] || keys['s'] || keys['S']) && ship.fuel > 0) {
+  if (isBrakeInput() && ship.fuel > 0) {
     ship.vx -= Math.cos(ship.angle) * BRAKE_POWER * 0.5;
     ship.vy -= Math.sin(ship.angle) * BRAKE_POWER * 0.5;
     ship.fuel -= 0.08;
     thrusting = true;
     spawnBrakeParticles(1);
   }
-  if (keys['ArrowLeft'] || keys['KeyA'] || keys['a'] || keys['A']) {
+  if (isLeftInput()) {
     ship.angle -= ROTATE_SPEED;
   }
-  if (keys['ArrowRight'] || keys['KeyD'] || keys['d'] || keys['D']) {
+  if (isRightInput()) {
     ship.angle += ROTATE_SPEED;
   }
 
@@ -943,7 +1090,7 @@ function renderShip() {
   ctx.translate(ship.x, ship.y);
   ctx.rotate(ship.angle);
 
-  const isThrusting = keys['ArrowUp'] || keys['KeyW'] || keys['w'] || keys['W'];
+  const isThrusting = isThrustInput();
 
   // ── Engine block (rear) ──
   ctx.fillStyle = '#3a3a4a';
@@ -1094,7 +1241,7 @@ function renderShip() {
   ctx.shadowBlur = 0;
 
   // ── Brake thrust (rear vents) ──
-  const isBraking = (keys['ArrowDown'] || keys['KeyS'] || keys['s'] || keys['S']) && ship.fuel > 0;
+  const isBraking = isBrakeInput() && ship.fuel > 0;
   if (isBraking) {
     ctx.fillStyle = 'rgba(255, 107, 53, 0.8)';
     ctx.beginPath();
@@ -1286,6 +1433,7 @@ function gameLoop() {
 // ==================== BOOT ====================
 resize();
 initStars();
+setupMobileControls();
 gameLoop();
 </script>
 </body>
